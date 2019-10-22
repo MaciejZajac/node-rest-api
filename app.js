@@ -4,7 +4,8 @@ const mongoose = require("mongoose");
 const path = require("path");
 const multer = require("multer");
 
-const feedRouter = require("./routes/feed");
+const feedRoutes = require("./routes/feed");
+const authRoutes = require("./routes/auth");
 
 const app = express();
 
@@ -38,14 +39,16 @@ app.use((req, res, next) => {
     next();
 });
 
-app.use("/feed", feedRouter);
+app.use("/feed", feedRoutes);
+app.use("/auth", authRoutes);
 
 app.use((error, req, res, next) => {
-    console.log("error", error);
     const status = error.statusCode || 500;
     const message = error.message;
+    const data = error.data;
     res.status(status).json({
-        message: message
+        message,
+        data
     });
 });
 
