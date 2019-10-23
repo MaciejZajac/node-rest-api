@@ -1,5 +1,6 @@
 const { validationResult } = require("express-validator/check");
 const Post = require("../models/post");
+const User = require("../models/user");
 const fs = require("fs");
 const path = require("path");
 
@@ -45,20 +46,30 @@ exports.createPost = (req, res, next) => {
     const imageUrl = req.file.path;
     const { title, content } = req.body;
 
+    let creator;
     const post = new Post({
         title,
         content,
         imageUrl: imageUrl,
-        creator: {
-            name: "Maciej"
-        }
+        creator: req.userId
     });
     post.save()
         .then(result => {
-            console.log(result);
+            return User.findById(User);
+        })
+        .then(user => {
+            creator = user;
+            user.posts.push(post);
+            user.save();
+        })
+        .then(result => {
             res.status(201).json({
                 message: "Post created successfully",
-                post: result
+                post: post,
+                creator: {
+                    _id: creator._id,
+                    name: creator.name
+                }
             });
         })
         .catch(err => {
@@ -116,6 +127,11 @@ exports.updatePost = (req, res, next) => {
                 error.statusCode = 404;
                 throw error;
             }
+            if (post.creator.toString() !== req.userId) {
+                const error = new Error("Not Authorized.");
+                error.statusCode = 403;
+                throw error;
+            }
             if (imageUrl !== post.imageUrl) {
                 clearImage(post.imageUrl);
             }
@@ -147,10 +163,22 @@ exports.deletePost = (req, res, next) => {
                 error.statusCode = 404;
                 throw error;
             }
+            if (post.creator.toString() !== req.userId) {
+                const error = new Error("Not Authorized.");
+                error.statusCode = 403;
+                throw error;
+            }
             // Check if logged in user is the owner of the post.
             clearImage(post.imageUrl);
 
             return Post.findByIdAndRemove(postId);
+        })
+        .then(result => {
+            return User.findById(req.userId);
+        })
+        .then(user => {
+            user.posts.pull(postId);
+            return user.save();
         })
         .then(result => {
             res.status(200).json({
